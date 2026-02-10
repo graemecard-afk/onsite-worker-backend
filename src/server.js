@@ -43,6 +43,34 @@ app.post("/shifts/start", async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+// GET /shifts/active?siteId=...
+// Returns active (not ended) shifts for a site, newest first
+app.get("/shifts/active", requireSupervisorToken, async (req, res) => {
+  try {
+    const { siteId } = req.query;
+
+    if (!siteId) {
+      return res.status(400).json({ error: "Missing siteId" });
+    }
+
+    const result = await query(
+      `
+      SELECT id, site_id, worker_email, started_at, ended_at
+      FROM shifts
+      WHERE site_id = $1
+        AND ended_at IS NULL
+      ORDER BY started_at DESC
+      `,
+      [siteId]
+    );
+
+    return res.json({ shifts: result.rows });
+  } catch (err) {
+    console.error("GET /shifts/active failed:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
 // POST /shifts/end
 // Marks a shift as finished
 app.post("/shifts/end", async (req, res) => {
