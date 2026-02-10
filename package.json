@@ -1,0 +1,30 @@
+{
+  "name": "onsite-worker-backend",
+  "version": "1.0.0",
+  "description": "Backend API for onsite worker PWA",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/graemecard-afk/onsite-worker-backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/graemecard-afk/onsite-worker-backend/issues"
+  },
+  "homepage": "https://github.com/graemecard-afk/onsite-worker-backend#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
