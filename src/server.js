@@ -10,7 +10,33 @@ const app = express();
 app.use(express.json());
 
 const corsOrigin = process.env.CORS_ORIGIN || "*";
-app.use(cors({ origin: corsOrigin }));
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // Allow requests with no origin (curl, server-to-server)
+      if (!origin) return cb(null, true);
+
+      // Allow all if wildcard
+      if (corsOrigin === "*") return cb(null, true);
+
+      // Allow exact match
+      if (origin === corsOrigin) return cb(null, true);
+
+      return cb(new Error("Not allowed by CORS"));
+    },
+    credentials: false,
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "x-api-token"],
+  })
+);
+
+// Explicit preflight handler (regex avoids the "*" crash)
+app.options(/.*/, cors());
+
+
+// Ensure preflight requests succeed
+
 
 // -----------------------
 // Health
@@ -70,6 +96,33 @@ app.get("/shifts/active", requireSupervisorToken, async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+// POST /shifts/end-all  { "siteId": "waiapu" }
+// Supervisor-only: ends all active shifts for a site
+app.post("/shifts/end-all", requireSupervisorToken, async (req, res) => {
+  try {
+    const { siteId } = req.body || {};
+
+    if (!siteId) {
+      return res.status(400).json({ error: "Missing siteId" });
+    }
+
+    const result = await query(
+      `
+      UPDATE shifts
+      SET ended_at = NOW()
+      WHERE site_id = $1
+        AND ended_at IS NULL
+      `,
+      [siteId]
+    );
+
+    return res.json({ ok: true, ended: result.rowCount });
+  } catch (err) {
+    console.error("POST /shifts/end-all failed:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
 
 // POST /shifts/end
 // Marks a shift as finished
