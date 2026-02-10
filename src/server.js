@@ -43,6 +43,32 @@ app.post("/shifts/start", async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+// GET /breadcrumbs?shiftId=UUID
+// Returns all breadcrumbs for a shift, ordered by time asc
+app.get("/breadcrumbs", async (req, res) => {
+  try {
+    const { shiftId } = req.query;
+
+    if (!shiftId) {
+      return res.status(400).json({ error: "Missing shiftId" });
+    }
+
+    const result = await query(
+      `
+      SELECT id, shift_id, at, lat, lng, accuracy_m
+      FROM breadcrumbs
+      WHERE shift_id = $1
+      ORDER BY at ASC
+      `,
+      [shiftId]
+    );
+
+    return res.json({ breadcrumbs: result.rows });
+  } catch (err) {
+    console.error("GET /breadcrumbs failed:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
 
 // -----------------------
 // Breadcrumbs
