@@ -73,17 +73,44 @@ app.post("/shifts/end", async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+// --- Simple token auth (stub) ---
+// Put SUPERVISOR_TOKEN in .env (never commit it)
+// Client sends:  x-api-token: <token>
+function requireSupervisorToken(req, res, next) {
+  const expected = process.env.SUPERVISOR_TOKEN;
+
+  if (!expected) {
+    console.error("Missing SUPERVISOR_TOKEN env var (server misconfigured)");
+    return res.status(500).json({ error: "Server misconfigured" });
+  }
+
+  const provided = req.header("x-api-token");
+
+  if (!provided || provided !== expected) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  return next();
+}
 
 
 // GET /breadcrumbs?shiftId=UUID
 // Returns all breadcrumbs for a shift, ordered by time asc
-app.get("/breadcrumbs", async (req, res) => {
+app.get("/breadcrumbs", requireSupervisorToken, async (req, res) => {
+
   try {
     const { shiftId } = req.query;
 
     if (!shiftId) {
       return res.status(400).json({ error: "Missing shiftId" });
     }
+// basic UUID v4-ish validation (prevents PG 22P02)
+const uuidRegex =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+if (!uuidRegex.test(String(shiftId))) {
+  return res.status(400).json({ error: "Invalid shiftId" });
+}
 
     const result = await query(
       `
