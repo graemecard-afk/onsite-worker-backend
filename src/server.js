@@ -1,10 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { pool } from "./db.js";
-import { query } from "./db.js";
-
-
+import { pool, query } from "./db.js";
 
 dotenv.config();
 
@@ -15,9 +12,16 @@ app.use(express.json());
 const corsOrigin = process.env.CORS_ORIGIN || "*";
 app.use(cors({ origin: corsOrigin }));
 
+// -----------------------
+// Health
+// -----------------------
 app.get("/health", (req, res) => {
   res.json({ ok: true, service: "onsite-worker-backend" });
 });
+
+// -----------------------
+// Shifts
+// -----------------------
 app.post("/shifts/start", async (req, res) => {
   try {
     const { siteId, workerEmail } = req.body || {};
@@ -40,6 +44,34 @@ app.post("/shifts/start", async (req, res) => {
   }
 });
 
+// -----------------------
+// Breadcrumbs
+// -----------------------
+app.post("/breadcrumbs", async (req, res) => {
+  try {
+    const { shiftId, at, lat, lng, accuracyM } = req.body || {};
+
+    if (!shiftId || !at || lat == null || lng == null) {
+      return res.status(400).json({ error: "Missing shiftId, at, lat, or lng" });
+    }
+
+    const result = await query(
+      `INSERT INTO breadcrumbs (shift_id, at, lat, lng, accuracy_m)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id`,
+      [shiftId, new Date(at), lat, lng, accuracyM ?? null]
+    );
+
+    return res.json({ ok: true, id: result.rows[0].id });
+  } catch (err) {
+    console.error("POST /breadcrumbs failed", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// -----------------------
+// Startup DB check
+// -----------------------
 pool
   .query("select 1")
   .then(() => console.log("✅ database connected"))
