@@ -60,6 +60,35 @@ app.post("/shifts/start", async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+// POST /shifts/end
+// Ends a shift by setting ended_at = now()
+app.post("/shifts/end", async (req, res) => {
+  try {
+    const { shiftId } = req.body || {};
+
+    if (!shiftId) {
+      return res.status(400).json({ error: "Missing shiftId" });
+    }
+
+    const result = await query(
+      `UPDATE shifts
+       SET ended_at = NOW()
+       WHERE id = $1
+       RETURNING id, ended_at`,
+      [String(shiftId)]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Shift not found" });
+    }
+
+    return res.json({ ok: true, shift: result.rows[0] });
+  } catch (err) {
+    console.error("POST /shifts/end failed", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
 
 // GET /shifts/active?siteId=STRING
 // Returns active (not ended) shifts for a site
