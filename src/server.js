@@ -60,6 +60,40 @@ app.post("/shifts/start", async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+
+// GET /shifts/active?siteId=STRING
+// Returns active (not ended) shifts for a site
+app.get("/shifts/active", async (req, res) => {
+  try {
+    const token = req.headers["x-api-token"];
+    const expectedToken = process.env.SUPERVISOR_TOKEN;
+
+    if (!expectedToken || token !== expectedToken) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { siteId } = req.query;
+
+    if (!siteId) {
+      return res.status(400).json({ error: "Missing siteId" });
+    }
+
+    const result = await query(
+      `SELECT id, site_id, worker_email, started_at
+       FROM shifts
+       WHERE site_id = $1
+         AND ended_at IS NULL
+       ORDER BY started_at DESC`,
+      [String(siteId)]
+    );
+
+    return res.json({ shifts: result.rows });
+  } catch (err) {
+    console.error("GET /shifts/active failed", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
 // GET /breadcrumbs?shiftId=UUID
 // Returns all breadcrumbs for a shift, ordered by time asc
 app.get("/breadcrumbs", async (req, res) => {
