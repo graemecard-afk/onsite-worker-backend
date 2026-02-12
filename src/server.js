@@ -10,33 +10,7 @@ const app = express();
 app.use(express.json());
 
 const corsOrigin = process.env.CORS_ORIGIN || "*";
-
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      // Allow requests with no origin (curl, server-to-server)
-      if (!origin) return cb(null, true);
-
-      // Allow all if wildcard
-      if (corsOrigin === "*") return cb(null, true);
-
-      // Allow exact match
-      if (origin === corsOrigin) return cb(null, true);
-
-      return cb(new Error("Not allowed by CORS"));
-    },
-    credentials: false,
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "x-api-token"],
-  })
-);
-
-// Explicit preflight handler (regex avoids the "*" crash)
-app.options(/.*/, cors());
-
-
-// Ensure preflight requests succeed
-
+app.use(cors({ origin: corsOrigin }));
 
 // -----------------------
 // Health
@@ -69,129 +43,15 @@ app.post("/shifts/start", async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
-// GET /shifts/active?siteId=...
-// Returns active (not ended) shifts for a site, newest first
-app.get("/shifts/active", requireSupervisorToken, async (req, res) => {
-  try {
-    const { siteId } = req.query;
-
-    if (!siteId) {
-      return res.status(400).json({ error: "Missing siteId" });
-    }
-
-    const result = await query(
-      `
-      SELECT id, site_id, worker_email, started_at, ended_at
-      FROM shifts
-      WHERE site_id = $1
-        AND ended_at IS NULL
-      ORDER BY started_at DESC
-      `,
-      [siteId]
-    );
-
-    return res.json({ shifts: result.rows });
-  } catch (err) {
-    console.error("GET /shifts/active failed:", err);
-    return res.status(500).json({ error: "Server error" });
-  }
-});
-// POST /shifts/end-all  { "siteId": "waiapu" }
-// Supervisor-only: ends all active shifts for a site
-app.post("/shifts/end-all", requireSupervisorToken, async (req, res) => {
-  try {
-    const { siteId } = req.body || {};
-
-    if (!siteId) {
-      return res.status(400).json({ error: "Missing siteId" });
-    }
-
-    const result = await query(
-      `
-      UPDATE shifts
-      SET ended_at = NOW()
-      WHERE site_id = $1
-        AND ended_at IS NULL
-      `,
-      [siteId]
-    );
-
-    return res.json({ ok: true, ended: result.rowCount });
-  } catch (err) {
-    console.error("POST /shifts/end-all failed:", err);
-    return res.status(500).json({ error: "Server error" });
-  }
-});
-
-
-// POST /shifts/end
-// Marks a shift as finished
-app.post("/shifts/end", async (req, res) => {
-  try {
-    const { shiftId } = req.body;
-
-    if (!shiftId) {
-      return res.status(400).json({ error: "Missing shiftId" });
-    }
-
-    const result = await query(
-      `
-      UPDATE shifts
-      SET ended_at = NOW()
-      WHERE id = $1
-      RETURNING *
-      `,
-      [shiftId]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Shift not found" });
-    }
-
-    return res.json({ shift: result.rows[0] });
-  } catch (err) {
-    console.error("POST /shifts/end failed:", err);
-    return res.status(500).json({ error: "Server error" });
-  }
-});
-// --- Simple token auth (stub) ---
-// Put SUPERVISOR_TOKEN in .env (never commit it)
-// Client sends:  x-api-token: <token>
-function requireSupervisorToken(req, res, next) {
-  const expected = process.env.SUPERVISOR_TOKEN;
-
-  if (!expected) {
-    console.error("Missing SUPERVISOR_TOKEN env var (server misconfigured)");
-    return res.status(500).json({ error: "Server misconfigured" });
-  }
-
-  const provided = req.header("x-api-token");
-
-  if (!provided || provided !== expected) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  return next();
-}
-
-
 // GET /breadcrumbs?shiftId=UUID
 // Returns all breadcrumbs for a shift, ordered by time asc
-app.get("/breadcrumbs", requireSupervisorToken, async (req, res) => {
-
+app.get("/breadcrumbs", async (req, res) => {
   try {
     const { shiftId } = req.query;
 
     if (!shiftId) {
       return res.status(400).json({ error: "Missing shiftId" });
     }
-// basic UUID v4-ish validation (prevents PG 22P02)
-const uuidRegex =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-if (!uuidRegex.test(String(shiftId))) {
-  return res.status(400).json({ error: "Invalid shiftId" });
-}
 
     const result = await query(
       `
