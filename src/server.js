@@ -89,6 +89,39 @@ app.post("/shifts/end", async (req, res) => {
   }
 });
 
+// GET /shifts/status?shiftId=UUID&workerEmail=email
+// Used by worker app to verify shift is still active
+app.get("/shifts/status", async (req, res) => {
+  try {
+    const { shiftId, workerEmail } = req.query;
+
+    if (!shiftId || !workerEmail) {
+      return res.status(400).json({ error: "Missing shiftId or workerEmail" });
+    }
+
+    const result = await query(
+      `SELECT id, site_id, worker_email, started_at, ended_at
+       FROM shifts
+       WHERE id = $1`,
+      [String(shiftId)]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Shift not found" });
+    }
+
+    const shift = result.rows[0];
+
+    if (shift.worker_email !== String(workerEmail).trim().toLowerCase()) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    return res.json({ shift });
+  } catch (err) {
+    console.error("GET /shifts/status failed", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
 
 // GET /shifts/active?siteId=STRING
 // Returns active (not ended) shifts for a site
