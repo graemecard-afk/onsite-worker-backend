@@ -122,6 +122,40 @@ app.get("/shifts/active", async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+// GET /debug/shift?id=UUID  (TEMP - remove after diagnosis)
+app.get("/debug/shift", async (req, res) => {
+  try {
+    const token = req.headers["x-api-token"];
+    const expectedToken = process.env.SUPERVISOR_TOKEN;
+
+    if (!expectedToken || token !== expectedToken) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { id } = req.query;
+    if (!id) {
+      return res.status(400).json({ error: "Missing id" });
+    }
+
+    const result = await query(
+      `SELECT id, site_id, worker_email, started_at, ended_at
+       FROM shifts
+       WHERE id = $1`,
+      [String(id)]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    return res.json({ shift: result.rows[0] });
+  } catch (err) {
+    console.error("GET /debug/shift failed", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+
 // POST /shifts/end-all
 // Ends all active shifts for a site (supervisor token required)
 app.post("/shifts/end-all", async (req, res) => {
