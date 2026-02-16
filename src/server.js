@@ -43,6 +43,37 @@ app.use(
 app.get("/health", (req, res) => {
   res.json({ ok: true, service: "onsite-worker-backend" });
 });
+// -----------------------
+// Auth
+// -----------------------
+app.post("/auth/register", async (req, res) => {
+  try {
+    const { email, password, role } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ error: "Missing email or password" });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    const userRole = role === "admin" ? "admin" : "worker";
+
+    const result = await query(
+      `INSERT INTO users (email, password_hash, role)
+       VALUES ($1, $2, $3)
+       RETURNING id, email, role, is_active, created_at`,
+      [normalizedEmail, passwordHash, userRole]
+    );
+
+    res.json({ ok: true, user: result.rows[0] });
+  } catch (err) {
+    // unique violation on email
+    if (String(err?.code) === "23505") {
+      return res.status(409).json({ error: "Email already registered" });
+    }
+    console.error("POST /auth/register failed", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 // -----------------------
 // Shifts
