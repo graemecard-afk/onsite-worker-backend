@@ -3,6 +3,16 @@ import { query, pool } from "./db.js";
 const SQL = `
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+  CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'worker',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
 CREATE TABLE IF NOT EXISTS shifts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   site_id TEXT NOT NULL,
