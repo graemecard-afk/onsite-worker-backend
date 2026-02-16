@@ -1,9 +1,17 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { pool, query } from "./db.js";
 
 dotenv.config();
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("Missing JWT_SECRET in environment");
+  process.exit(1);
+}
+
 
 const app = express();
 
