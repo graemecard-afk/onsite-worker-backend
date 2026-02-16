@@ -43,6 +43,22 @@ app.use(
 app.get("/health", (req, res) => {
   res.json({ ok: true, service: "onsite-worker-backend" });
 });
+function requireAuth(req, res, next) {
+  try {
+    const header = String(req.headers.authorization || "");
+    const [type, token] = header.split(" ");
+    if (type !== "Bearer" || !token) {
+      return res.status(401).json({ error: "Missing bearer token" });
+    }
+
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = { id: payload.sub, email: payload.email, role: payload.role };
+    return next();
+  } catch (err) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+}
+
 // -----------------------
 // Auth
 // -----------------------
