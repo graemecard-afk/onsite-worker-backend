@@ -132,13 +132,14 @@ app.post("/auth/login", async (req, res) => {
 // -----------------------
 // Shifts
 // -----------------------
-app.post("/shifts/start", async (req, res) => {
+app.post("/shifts/start", requireAuth, async (req, res) => {
   try {
-    const { siteId, workerEmail } = req.body || {};
+    const { siteId } = req.body || {};
+    const workerEmail = req.user?.email;
 
-    if (!siteId || !workerEmail) {
-      return res.status(400).json({ error: "Missing siteId or workerEmail" });
-    }
+      if (!siteId || !workerEmail) {
+       return res.status(400).json({ error: "Missing siteId" });
+      }
 
     const result = await query(
       `INSERT INTO shifts (site_id, worker_email)
