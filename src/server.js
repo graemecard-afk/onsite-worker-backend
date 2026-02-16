@@ -74,6 +74,44 @@ app.post("/auth/register", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+app.post("/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ error: "Missing email or password" });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    const result = await query(
+      `SELECT id, email, password_hash, role, is_active
+       FROM users
+       WHERE email = $1`,
+      [normalizedEmail]
+    );
+
+    const user = result.rows[0];
+    if (!user || !user.is_active) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const ok = await bcrypt.compare(String(password), String(user.password_hash));
+    if (!ok) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { sub: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "12h" }
+    );
+
+    res.json({ ok: true, token, user: { id: user.id, email: user.email, role: user.role } });
+  } catch (err) {
+    console.error("POST /auth/login failed", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 // -----------------------
 // Shifts
