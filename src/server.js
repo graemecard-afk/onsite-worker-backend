@@ -187,13 +187,13 @@ app.post("/shifts/end", async (req, res) => {
 
 // GET /shifts/status?shiftId=UUID&workerEmail=email
 // Used by worker app to verify shift is still active
-app.get("/shifts/status", async (req, res) => {
+app.get("/shifts/status", requireAuth, async (req, res) => {
   try {
-    const { shiftId, workerEmail } = req.query;
+    const { shiftId } = req.query;
 
-    if (!shiftId || !workerEmail) {
-      return res.status(400).json({ error: "Missing shiftId or workerEmail" });
-    }
+ if (!shiftId) {
+  return res.status(400).json({ error: "Missing shiftId" });
+}
 
     const result = await query(
       `SELECT id, site_id, worker_email, started_at, ended_at
@@ -208,9 +208,9 @@ app.get("/shifts/status", async (req, res) => {
 
     const shift = result.rows[0];
 
-    if (shift.worker_email !== String(workerEmail).trim().toLowerCase()) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
+ if (shift.worker_email !== req.user.email) {
+  return res.status(403).json({ error: "Forbidden" });
+}
 
     return res.json({ shift });
   } catch (err) {
