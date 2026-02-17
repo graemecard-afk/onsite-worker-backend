@@ -136,6 +136,42 @@ app.post("/auth/login", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+// Admin password reset (admin only)
+// POST /admin/users/reset-password  { email, newPassword }
+app.post("/admin/users/reset-password", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { email, newPassword } = req.body || {};
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: "Missing email or newPassword" });
+    }
+
+    const targetEmail = String(email).trim().toLowerCase();
+
+    // prevent locking yourself out accidentally
+    if (targetEmail === "graeme.card@gdc.govt.nz") {
+      return res.status(400).json({ error: "Cannot reset admin password via this endpoint" });
+    }
+
+    const passwordHash = await bcrypt.hash(String(newPassword), 10);
+
+    const result = await query(
+      `UPDATE users
+       SET password_hash = $1
+       WHERE email = $2
+       RETURNING id, email, role, is_active`,
+      [passwordHash, targetEmail]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    return res.json({ ok: true, user: result.rows[0] });
+  } catch (err) {
+    console.error("POST /admin/users/reset-password failed", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
 
 // -----------------------
 // Shifts
