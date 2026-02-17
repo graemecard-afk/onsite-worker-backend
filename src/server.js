@@ -383,13 +383,26 @@ app.get("/breadcrumbs", async (req, res) => {
 // -----------------------
 // Breadcrumbs
 // -----------------------
-app.post("/breadcrumbs", async (req, res) => {
+app.post("/breadcrumbs", requireAuth, async (req, res) => {
   try {
     const { shiftId, at, lat, lng, accuracyM } = req.body || {};
 
     if (!shiftId || !at || lat == null || lng == null) {
       return res.status(400).json({ error: "Missing shiftId, at, lat, or lng" });
     }
+      // Ensure the shift belongs to the authenticated user
+      const shiftCheck = await query(
+        `SELECT worker_email FROM shifts WHERE id = $1`,
+        [String(shiftId)]
+      );
+
+      if (shiftCheck.rowCount === 0) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+
+      if (shiftCheck.rows[0].worker_email !== req.user.email) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
 
     const result = await query(
       `INSERT INTO breadcrumbs (shift_id, at, lat, lng, accuracy_m)
