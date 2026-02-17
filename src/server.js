@@ -64,14 +64,16 @@ function requireAuth(req, res, next) {
 // -----------------------
 app.post("/auth/register", async (req, res) => {
   try {
-    const { email, password, role } = req.body || {};
+    const { email, password } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ error: "Missing email or password" });
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
     const passwordHash = await bcrypt.hash(String(password), 10);
-    const userRole = role === "admin" ? "admin" : "worker";
+    const ADMIN_EMAIL = "graeme.card@gdc.govt.nz";
+    const userRole = normalizedEmail === ADMIN_EMAIL ? "admin" : "worker";
+
 
     const result = await query(
       `INSERT INTO users (email, password_hash, role)
