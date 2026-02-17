@@ -58,6 +58,12 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: "Invalid token" });
   }
 }
+function requireAdmin(req, res, next) {
+  if (!req.user || req.user.role !== "admin") {
+    return res.status(403).json({ error: "Admin only" });
+  }
+  return next();
+}
 
 // -----------------------
 // Auth
@@ -221,14 +227,9 @@ app.get("/shifts/status", requireAuth, async (req, res) => {
 
 // GET /shifts/active?siteId=STRING
 // Returns active (not ended) shifts for a site
-app.get("/shifts/active", async (req, res) => {
+app.get("/shifts/active", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const token = req.headers["x-api-token"];
-    const expectedToken = process.env.SUPERVISOR_TOKEN;
-
-    if (!expectedToken || token !== expectedToken) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    
 
     const { siteId } = req.query;
 
