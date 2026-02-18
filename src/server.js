@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { pool, query } from "./db.js";
+import { buildShiftReportCsv } from "./reports/shiftReportCsv.js";
 
 dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -288,6 +289,27 @@ app.get("/shifts/active", requireAuth, requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+// GET /admin/shifts/report.csv?shiftId=UUID
+app.get("/admin/shifts/report.csv", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { shiftId } = req.query;
+
+    const { csv, shiftId: id } = await buildShiftReportCsv({
+      query,
+      shiftId,
+    });
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="shift-${id}.csv"`);
+
+    return res.status(200).send(csv);
+  } catch (err) {
+    const status = err.statusCode || 500;
+    console.error("GET /admin/shifts/report.csv failed", err);
+    return res.status(status).json({ error: err.message || "Server error" });
+  }
+});
+
 // GET /debug/shift?id=UUID  (TEMP - remove after diagnosis)
 app.get("/debug/shift", async (req, res) => {
   try {
