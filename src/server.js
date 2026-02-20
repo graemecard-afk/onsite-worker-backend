@@ -445,6 +445,69 @@ app.post("/breadcrumbs", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+  // -----------------------
+  // Tasks
+  // -----------------------
+  app.post("/tasks/start", requireAuth, async (req, res) => {
+    try {
+      const { shiftId, taskLabel } = req.body || {};
+
+      if (!shiftId || !taskLabel || !String(taskLabel).trim()) {
+        return res.status(400).json({ error: "Missing shiftId or taskLabel" });
+      }
+
+      // Ensure the shift belongs to the authenticated user AND is active
+      const shiftCheck = await query(
+        `SELECT worker_email, ended_at
+         FROM shifts
+         WHERE id = $1`,
+        [String(shiftId)]
+      );
+
+      if (shiftCheck.rowCount === 0) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+
+      const shiftRow = shiftCheck.rows[0];
+
+      if (shiftRow.worker_email !== req.user.email) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      if (shiftRow.ended_at) {
+        return res.status(400).json({ error: "Shift already ended" });
+      }
+
+      // Optional safety: prevent multiple concurrent active tasks for this shift
+      const activeTaskCheck = await query(
+        `SELECT id
+         FROM tasks
+         WHERE shift_id = $1
+           AND ended_at IS NULL
+         LIMIT 1`,
+        [String(shiftId)]
+      );
+
+      if (activeTaskCheck.rowCount > 0) {
+        return res.status(400).json({ error: "A task is already active for this shift" });
+      }
+
+      const insert = await query(
+        `INSERT INTO tasks (shift_id, worker_email, task_label, started_at)
+         VALUES ($1, $2, $3, NOW())
+         RETURNING id, started_at`,
+        [String(shiftId), req.user.email, String(taskLabel).trim()]
+      );
+
+      return res.json({
+        ok: true,
+        task: { id: insert.rows[0].id, started_at: insert.rows[0].started_at },
+      });
+    } catch (err) {
+      console.error("POST /tasks/start failed", err);
+      return res.status(500).json({ error: "Server error" });
+    }
+  });
 
 // -----------------------
 // Startup DB check
