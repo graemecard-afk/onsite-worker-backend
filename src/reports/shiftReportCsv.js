@@ -1,5 +1,5 @@
 // src/reports/shiftReportCsv.js
-// Builds an admin CSV export for a single shift (summary + breadcrumbs)
+// Builds an admin CSV export for a single shift (summary + tasks + breadcrumbs)
 
 export async function buildShiftReportCsv({ query, shiftId }) {
   if (!shiftId) {
@@ -31,7 +31,15 @@ export async function buildShiftReportCsv({ query, shiftId }) {
     [String(shiftId)]
   );
 
-  const escapeCsv = v => {
+  const taskResult = await query(
+    `SELECT id, shift_id, task_label, started_at, ended_at
+     FROM tasks
+     WHERE shift_id = $1
+     ORDER BY started_at ASC`,
+    [String(shiftId)]
+  );
+
+  const escapeCsv = (v) => {
     if (v === null || v === undefined) return "";
     const s = String(v);
     if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
@@ -54,18 +62,35 @@ export async function buildShiftReportCsv({ query, shiftId }) {
     ["shift_summary", "ended_at", shift.ended_at],
     ["shift_summary", "duration_minutes", durationMinutes],
     ["shift_summary", "breadcrumbs_count", bcResult.rowCount],
+    ["shift_summary", "tasks_count", taskResult.rowCount],
   ];
 
   for (const r of summaryRows) lines.push(r.map(escapeCsv).join(","));
 
+  // ---- Tasks section ----
+  lines.push("");
+  lines.push("section,task_id,shift_id,task_label,started_at,ended_at,duration_minutes");
+
+  for (const t of taskResult.rows) {
+    const ts = t.started_at ? new Date(t.started_at) : null;
+    const te = t.ended_at ? new Date(t.ended_at) : null;
+    const taskDurationMinutes =
+      ts && te ? Math.max(0, Math.round((te - ts) / 60000)) : "";
+
+    lines.push(
+      ["tasks", t.id, t.shift_id, t.task_label, t.started_at, t.ended_at, taskDurationMinutes]
+        .map(escapeCsv)
+        .join(",")
+    );
+  }
+
+  // ---- Breadcrumbs section ----
   lines.push("");
   lines.push("section,id,shift_id,at,lat,lng,accuracy_m");
 
   for (const b of bcResult.rows) {
     lines.push(
-      ["breadcrumbs", b.id, b.shift_id, b.at, b.lat, b.lng, b.accuracy_m]
-        .map(escapeCsv)
-        .join(",")
+      ["breadcrumbs", b.id, b.shift_id, b.at, b.lat, b.lng, b.accuracy_m].map(escapeCsv).join(",")
     );
   }
 
