@@ -29,7 +29,16 @@ CREATE TABLE IF NOT EXISTS breadcrumbs (
   lng DOUBLE PRECISION NOT NULL,
   accuracy_m DOUBLE PRECISION NULL
 );
+  CREATE TABLE IF NOT EXISTS tasks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    shift_id UUID NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+    worker_email TEXT NOT NULL,
+    task_label TEXT NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ended_at TIMESTAMPTZ NULL
+  );
 
+  CREATE INDEX IF NOT EXISTS idx_tasks_shift_started ON tasks(shift_id, started_at);
 CREATE INDEX IF NOT EXISTS idx_breadcrumbs_shift_at ON breadcrumbs(shift_id, at);
 `;
 
