@@ -508,7 +508,66 @@ app.post("/breadcrumbs", requireAuth, async (req, res) => {
       return res.status(500).json({ error: "Server error" });
     }
   });
+  app.post("/tasks/end", requireAuth, async (req, res) => {
+    try {
+      const { taskId } = req.body || {};
 
+      if (!taskId) {
+        return res.status(400).json({ error: "Missing taskId" });
+      }
+
+      // Ensure the task belongs to the authenticated user and is still active
+      const taskCheck = await query(
+        `SELECT id, shift_id, worker_email, ended_at
+         FROM tasks
+         WHERE id = $1`,
+        [String(taskId)]
+      );
+
+      if (taskCheck.rowCount === 0) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const taskRow = taskCheck.rows[0];
+
+      if (taskRow.worker_email !== req.user.email) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      if (taskRow.ended_at) {
+        return res.status(400).json({ error: "Task already ended" });
+      }
+
+      // Optional: ensure the shift is still active
+      const shiftCheck = await query(
+        `SELECT ended_at
+         FROM shifts
+         WHERE id = $1`,
+        [String(taskRow.shift_id)]
+      );
+
+      if (shiftCheck.rowCount === 0) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+
+      if (shiftCheck.rows[0].ended_at) {
+        return res.status(400).json({ error: "Shift already ended" });
+      }
+
+      const update = await query(
+        `UPDATE tasks
+         SET ended_at = NOW()
+         WHERE id = $1
+         RETURNING ended_at`,
+        [String(taskId)]
+      );
+
+      return res.json({ ok: true, task: { id: String(taskId), ended_at: update.rows[0].ended_at } });
+    } catch (err) {
+      console.error("POST /tasks/end failed", err);
+      return res.status(500).json({ error: "Server error" });
+    }
+  });
 // -----------------------
 // Startup DB check
 // -----------------------
