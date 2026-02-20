@@ -270,17 +270,23 @@ app.get("/shifts/active", requireAuth, requireAdmin, async (req, res) => {
 
     const { siteId } = req.query;
 
-    if (!siteId) {
-      return res.status(400).json({ error: "Missing siteId" });
-    }
+    const hasSite = typeof siteId === "string" && siteId.trim() !== "";
 
-    const result = await query(
+const result = hasSite
+  ? await query(
       `SELECT id, site_id, worker_email, started_at
        FROM shifts
        WHERE site_id = $1
          AND ended_at IS NULL
        ORDER BY started_at DESC`,
-      [String(siteId)]
+      [siteId.trim()]
+    )
+  : await query(
+      `SELECT id, site_id, worker_email, started_at
+       FROM shifts
+       WHERE ended_at IS NULL
+       ORDER BY started_at DESC`,
+      []
     );
 
     return res.json({ shifts: result.rows });
