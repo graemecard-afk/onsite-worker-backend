@@ -295,6 +295,43 @@ const result = hasSite
     return res.status(500).json({ error: "Server error" });
   }
 });
+// GET /shifts/recent?siteId=STRING&days=N
+// Returns recently ended shifts (default last 7 days)
+app.get("/shifts/recent", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { siteId, days } = req.query;
+
+    const windowDays = Number(days) > 0 ? Number(days) : 7;
+
+    const hasSite = typeof siteId === "string" && siteId.trim() !== "";
+
+    const result = hasSite
+      ? await query(
+          `SELECT id, site_id, worker_email, started_at, ended_at
+           FROM shifts
+           WHERE site_id = $1
+             AND ended_at IS NOT NULL
+             AND ended_at >= NOW() - INTERVAL '${windowDays} days'
+           ORDER BY ended_at DESC
+           LIMIT 50`,
+          [siteId.trim()]
+        )
+      : await query(
+          `SELECT id, site_id, worker_email, started_at, ended_at
+           FROM shifts
+           WHERE ended_at IS NOT NULL
+             AND ended_at >= NOW() - INTERVAL '${windowDays} days'
+           ORDER BY ended_at DESC
+           LIMIT 50`,
+          []
+        );
+
+    return res.json({ shifts: result.rows });
+  } catch (err) {
+    console.error("GET /shifts/recent failed", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
 // GET /admin/shifts/report.csv?shiftId=UUID
 app.get("/admin/shifts/report.csv", requireAuth, requireAdmin, async (req, res) => {
   try {
