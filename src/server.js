@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { pool, query } from "./db.js";
 import { buildShiftReportCsv } from "./reports/shiftReportCsv.js";
+import { buildShiftTrackGeoJson } from "./reports/shiftTrackGeoJson.js";
 
 dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -349,6 +350,26 @@ app.get("/admin/shifts/report.csv", requireAuth, requireAdmin, async (req, res) 
   } catch (err) {
     const status = err.statusCode || 500;
     console.error("GET /admin/shifts/report.csv failed", err);
+    return res.status(status).json({ error: err.message || "Server error" });
+  }
+});
+// GET /admin/shifts/track.geojson?shiftId=UUID
+app.get("/admin/shifts/track.geojson", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { shiftId } = req.query;
+
+    const { geojson, shiftId: id } = await buildShiftTrackGeoJson({
+      query,
+      shiftId,
+    });
+
+    res.setHeader("Content-Type", "application/geo+json; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="shift-${id}.geojson"`);
+
+    return res.status(200).json(geojson);
+  } catch (err) {
+    const status = err.statusCode || 500;
+    console.error("GET /admin/shifts/track.geojson failed", err);
     return res.status(status).json({ error: err.message || "Server error" });
   }
 });
