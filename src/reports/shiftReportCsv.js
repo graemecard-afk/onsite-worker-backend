@@ -45,7 +45,20 @@ export async function buildShiftReportCsv({ query, shiftId }) {
     if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
-
+  // Format all exported CSV timestamps in Pacific/Auckland local time (not UTC)
+const formatNzDateTime = (v) => {
+  if (!v) return "";
+  return new Date(v).toLocaleString("en-NZ", {
+    timeZone: "Pacific/Auckland",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+};
   const startedAt = shift.started_at ? new Date(shift.started_at) : null;
   const endedAt = shift.ended_at ? new Date(shift.ended_at) : null;
   const durationMinutes =
@@ -58,8 +71,8 @@ export async function buildShiftReportCsv({ query, shiftId }) {
     ["shift_summary", "shift_id", shift.id],
     ["shift_summary", "site_id", shift.site_id],
     ["shift_summary", "worker_email", shift.worker_email],
-    ["shift_summary", "started_at", shift.started_at],
-    ["shift_summary", "ended_at", shift.ended_at],
+   ["shift_summary", "started_at", formatNzDateTime(shift.started_at)],
+["shift_summary", "ended_at", formatNzDateTime(shift.ended_at)],
     ["shift_summary", "duration_minutes", durationMinutes],
     ["shift_summary", "breadcrumbs_count", bcResult.rowCount],
     ["shift_summary", "tasks_count", taskResult.rowCount],
@@ -78,8 +91,7 @@ export async function buildShiftReportCsv({ query, shiftId }) {
       ts && te ? Math.max(0, Math.round((te - ts) / 60000)) : "";
 
     lines.push(
-      ["tasks", t.id, t.shift_id, t.task_label, t.started_at, t.ended_at, taskDurationMinutes]
-        .map(escapeCsv)
+     ["tasks", t.id, t.shift_id, t.task_label, formatNzDateTime(t.started_at), formatNzDateTime(t.ended_at), taskDurationMinutes].map(escapeCsv)
         .join(",")
     );
   }
@@ -90,8 +102,7 @@ export async function buildShiftReportCsv({ query, shiftId }) {
 
   for (const b of bcResult.rows) {
     lines.push(
-      ["breadcrumbs", b.id, b.shift_id, b.at, b.lat, b.lng, b.accuracy_m].map(escapeCsv).join(",")
-    );
+      ["breadcrumbs", b.id, b.shift_id, formatNzDateTime(b.at), b.lat, b.lng, b.accuracy_m].map(escapeCsv).join(",")  );
   }
 
   return { shiftId: shift.id, csv: lines.join("\n") };
